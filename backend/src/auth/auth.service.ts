@@ -135,6 +135,19 @@ export class AuthService {
     };
   }
 
+  async logout(userId: number, sessionId: string): Promise<void> {
+    await this.database.db
+      .update(refreshSessions)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(refreshSessions.id, sessionId),
+          eq(refreshSessions.userId, userId),
+          isNull(refreshSessions.revokedAt),
+        ),
+      );
+  }
+
   async getProfile(userId: number): Promise<User> {
     const [user] = await this.database.db
       .select()

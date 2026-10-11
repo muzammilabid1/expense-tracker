@@ -2,7 +2,7 @@ import {
   Injectable,
   Module,
   OnApplicationShutdown,
-} from '@nestjs/commo n';
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';

@@ -7,9 +7,16 @@ import {
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
 
-type AuthenticatedUser = {
+type JwtPayload = {
   sub: string;
   email: string;
+  sid: string;
+};
+
+type AuthenticatedUser = {
+  sub: number;
+  email: string;
+  sid: string;
 };
 
 type GraphqlContext = {
@@ -37,7 +44,21 @@ export class GqlAuthGuard implements CanActivate {
     const token = authorization.slice('Bearer '.length);
 
     try {
-      req.user = await this.jwtService.verifyAsync<AuthenticatedUser>(token);
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+      const userId = Number(payload.sub);
+
+      if (
+        !payload ||
+        !Number.isSafeInteger(userId) ||
+        userId <= 0 ||
+        typeof payload.email !== 'string' ||
+        typeof payload.sid !== 'string' ||
+        payload.sid.length === 0
+      ) {
+        throw new Error('Invalid user claims.');
+      }
+
+      req.user = { ...payload, sub: userId };
       return true;
     } catch {
       throw new UnauthorizedException('The token is invalid or expired.');
