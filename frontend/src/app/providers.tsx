@@ -1,7 +1,7 @@
 'use client';
 
 import '@ant-design/v5-patch-for-react-19';
-import { ConfigProvider, theme } from 'antd';
+import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import { AuthProvider } from '@/lib/auth-context';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -16,7 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         fontFamily: 'Arial, Helvetica, sans-serif', controlHeight: 44,
       },
     }}>
-      <AuthProvider>{children}</AuthProvider>
+      <AntdApp>
+        <AuthProvider>{children}</AuthProvider>
+      </AntdApp>
     </ConfigProvider>
   );
 }

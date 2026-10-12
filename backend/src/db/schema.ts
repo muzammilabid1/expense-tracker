@@ -49,6 +49,23 @@ export const refreshSessions = pgTable(
   (table) => [index('refresh_sessions_user_id_idx').on(table.userId)],
 );
 
+export const emailChangeVerifications = pgTable(
+  'email_change_verifications',
+  {
+    userId: integer('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    email: varchar('email', { length: 255 }).notNull(),
+    codeHash: varchar('code_hash', { length: 255 }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex('email_change_verifications_email_idx').on(table.email)],
+);
+
 export const categories = pgTable(
   'categories',
   {

@@ -46,7 +46,7 @@ export class AuthResolver {
     context.res.cookie('refreshToken', session.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/graphql',
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
@@ -61,7 +61,7 @@ export class AuthResolver {
     context.res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/graphql',
     });
     return true;
@@ -82,6 +82,24 @@ export class AuthResolver {
     return this.authService.updateProfile(context.req.user!.sub, input);
   }
 
+  @Mutation(() => Boolean)
+  @UseGuards(GqlAuthGuard)
+  requestEmailChange(
+    @Args('email') email: string,
+    @Context() context: GraphqlRequestContext,
+  ): Promise<boolean> {
+    return this.authService.requestEmailChange(context.req.user!.sub, email);
+  }
+
+  @Mutation(() => User)
+  @UseGuards(GqlAuthGuard)
+  verifyEmailChange(
+    @Args('code') code: string,
+    @Context() context: GraphqlRequestContext,
+  ): Promise<User> {
+    return this.authService.verifyEmailChange(context.req.user!.sub, code);
+  }
+
   private withRefreshCookie(
     session: AuthSession,
     context: GraphqlRequestContext,
@@ -89,7 +107,7 @@ export class AuthResolver {
     context.res.cookie('refreshToken', session.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/graphql',
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });

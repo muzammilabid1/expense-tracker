@@ -8,6 +8,13 @@
       "when": 1791545287301,
       "tag": "0000_rich_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791799654723,
+      "tag": "0001_cute_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

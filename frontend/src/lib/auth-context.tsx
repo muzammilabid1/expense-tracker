@@ -68,7 +68,7 @@ export function Protected({ children }: { children: React.ReactNode }) {
   const { token, ready } = useAuth();
   const router = useRouter();
   useEffect(() => { if (ready && !token) router.replace('/login'); }, [ready, token, router]);
-  if (!ready || !token) return <div className="screen-loader"><span className="loader-dot" />Loading your account…</div>;
+  if (!ready || !token) return <div className="screen-loader" role="status" aria-label="Loading"><span className="loader-dot" /></div>;
   return children;
 }
 
@@ -76,6 +76,6 @@ export function PublicOnly({ children }: { children: React.ReactNode }) {
   const { token, ready } = useAuth();
   const router = useRouter();
   useEffect(() => { if (ready && token) router.replace('/dashboard'); }, [ready, token, router]);
-  if (!ready || token) return <div className="screen-loader"><span className="loader-dot" />Loading your account…</div>;
+  if (!ready || token) return <div className="screen-loader" role="status" aria-label="Loading"><span className="loader-dot" /></div>;
   return children;
 }

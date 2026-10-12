@@ -83,6 +83,8 @@ export const queries = {
   logout: `mutation Logout { logout }`,
   me: `query Me { me { id name email createdAt } }`,
   updateProfile: `mutation UpdateProfile($input: UpdateProfileInput!) { updateProfile(input: $input) { id name email createdAt } }`,
+  requestEmailChange: `mutation RequestEmailChange($email: String!) { requestEmailChange(email: $email) }`,
+  verifyEmailChange: `mutation VerifyEmailChange($code: String!) { verifyEmailChange(code: $code) { id name email createdAt } }`,
   categories: `query Categories { categories { id userId name type color } }`,
   createCategory: `mutation CreateCategory($input: CreateCategoryInput!) { createCategory(input: $input) { id userId name type color } }`,
   updateCategory: `mutation UpdateCategory($input: UpdateCategoryInput!) { updateCategory(input: $input) { id userId name type color } }`,

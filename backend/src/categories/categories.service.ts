@@ -96,8 +96,17 @@ export class CategoriesService {
   }
 
   private rethrowUnique(error: unknown): void {
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+    if (this.getDatabaseErrorCode(error) === '23505') {
       throw new ConflictException('A category with this name and type already exists.');
     }
+  }
+
+  private getDatabaseErrorCode(error: unknown, visited = new Set<object>()): string | undefined {
+    if (typeof error !== 'object' || error === null || visited.has(error)) return undefined;
+    visited.add(error);
+
+    if ('code' in error && typeof error.code === 'string') return error.code;
+    if ('cause' in error) return this.getDatabaseErrorCode(error.cause, visited);
+    return undefined;
   }
 }

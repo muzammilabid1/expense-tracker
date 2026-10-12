@@ -13,7 +13,7 @@ export type GraphqlRequestContext = {
       options: {
         httpOnly: boolean;
         secure: boolean;
-        sameSite: 'lax';
+        sameSite: 'lax' | 'none';
         path: string;
         maxAge: number;
       },
@@ -23,7 +23,7 @@ export type GraphqlRequestContext = {
       options: {
         httpOnly: boolean;
         secure: boolean;
-        sameSite: 'lax';
+        sameSite: 'lax' | 'none';
         path: string;
       },
     ) => void;

@@ -5,6 +5,7 @@ import { DatabaseModule } from '../db/database.module';
 import { AuthService } from './auth.service';
 import { GqlAuthGuard } from './gql-auth.guard';
 import { AuthResolver } from './auth.resolver';
+import { EmailService } from './email.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { AuthResolver } from './auth.resolver';
       }),
     }),
   ],
-  providers: [AuthService, AuthResolver, GqlAuthGuard],
+  providers: [AuthService, AuthResolver, GqlAuthGuard, EmailService],
   exports: [AuthService, GqlAuthGuard, JwtModule],
 })
 export class AuthModule {}
