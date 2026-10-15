@@ -83,6 +83,21 @@ export const signupVerifications = pgTable(
   (table) => [uniqueIndex('signup_verifications_email_idx').on(table.email)],
 );
 
+export const passwordResetVerifications = pgTable(
+  'password_reset_verifications',
+  {
+    userId: integer('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    codeHash: varchar('code_hash', { length: 255 }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
 export const categories = pgTable(
   'categories',
   {
