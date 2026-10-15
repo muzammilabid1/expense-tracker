@@ -10,6 +10,7 @@ import { AuthService, AuthSession } from './auth.service';
 import {
   AuthPayload,
   LoginInput,
+  ResetPasswordInput,
   SignupInput,
   UpdateProfileInput,
   User,
@@ -44,6 +45,16 @@ export class AuthResolver {
     @Context() context: GraphqlRequestContext,
   ): Promise<AuthPayload> {
     return this.withRefreshCookie(await this.authService.login(input), context);
+  }
+
+  @Mutation(() => Boolean)
+  requestPasswordReset(@Args('email') email: string): Promise<boolean> {
+    return this.authService.requestPasswordReset(email);
+  }
+
+  @Mutation(() => Boolean)
+  resetPassword(@Args('input') input: ResetPasswordInput): Promise<boolean> {
+    return this.authService.resetPassword(input);
   }
 
   @Mutation(() => AuthPayload)

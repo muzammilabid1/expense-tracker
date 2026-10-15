@@ -16,6 +16,10 @@ export class EmailService {
     await this.sendCode(to, code, 'Verify your Northstar account', 'signup-otp.ejs');
   }
 
+  async sendPasswordResetCode(to: string, code: string): Promise<void> {
+    await this.sendCode(to, code, 'Reset your Northstar password', 'password-reset-otp.ejs');
+  }
+
   private async sendCode(
     to: string,
     code: string,

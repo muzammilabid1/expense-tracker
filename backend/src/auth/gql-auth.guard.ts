@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
+import { and, eq, gt, isNull } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.module';
+import { refreshSessions } from '../db/schema';
 
 type JwtPayload = {
   sub: string;
@@ -30,7 +33,10 @@ type GraphqlContext = {
 
 @Injectable()
 export class GqlAuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly database: DatabaseService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const graphqlContext = GqlExecutionContext.create(context);
@@ -57,6 +63,21 @@ export class GqlAuthGuard implements CanActivate {
       ) {
         throw new Error('Invalid user claims.');
       }
+
+      const [session] = await this.database.db
+        .select({ id: refreshSessions.id })
+        .from(refreshSessions)
+        .where(
+          and(
+            eq(refreshSessions.id, payload.sid),
+            eq(refreshSessions.userId, userId),
+            isNull(refreshSessions.revokedAt),
+            gt(refreshSessions.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+
+      if (!session) throw new Error('The session is revoked or expired.');
 
       req.user = { ...payload, sub: userId };
       return true;

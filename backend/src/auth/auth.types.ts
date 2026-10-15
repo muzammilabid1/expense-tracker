@@ -61,6 +61,18 @@ export class VerifySignupInput {
 }
 
 @InputType()
+export class ResetPasswordInput {
+  @Field()
+  email!: string;
+
+  @Field()
+  code!: string;
+
+  @Field()
+  newPassword!: string;
+}
+
+@InputType()
 export class UpdateProfileInput {
   @Field({ nullable: true })
   name?: string;

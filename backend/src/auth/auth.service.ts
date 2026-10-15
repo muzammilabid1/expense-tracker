@@ -15,6 +15,7 @@ import { hash, verify } from 'argon2';
 import { DatabaseService } from '../db/database.module';
 import {
   emailChangeVerifications,
+  passwordResetVerifications,
   refreshSessions,
   signupVerifications,
   users,
@@ -23,6 +24,7 @@ import { EmailService } from './email.service';
 import {
   AuthPayload,
   LoginInput,
+  ResetPasswordInput,
   SignupInput,
   UpdateProfileInput,
   User,
@@ -221,6 +223,123 @@ export class AuthService {
     }
 
     return this.createSession(user);
+  }
+
+  async requestPasswordReset(rawEmail: string): Promise<boolean> {
+    const email = this.normalizeEmail(rawEmail);
+    const [user] = await this.database.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    // Return the same result for unknown emails to prevent account enumeration.
+    if (!user) return true;
+
+    const now = new Date();
+    const [existingRequest] = await this.database.db
+      .select()
+      .from(passwordResetVerifications)
+      .where(eq(passwordResetVerifications.userId, user.id))
+      .limit(1);
+
+    if (existingRequest && now.getTime() - existingRequest.createdAt.getTime() < 60_000) {
+      return true;
+    }
+
+    const code = String(randomInt(100_000, 1_000_000));
+    const codeHash = await hash(code);
+    const expiresAt = new Date(now.getTime() + 10 * 60_000);
+    await this.database.db
+      .insert(passwordResetVerifications)
+      .values({ userId: user.id, codeHash, expiresAt, createdAt: now })
+      .onConflictDoUpdate({
+        target: passwordResetVerifications.userId,
+        set: { codeHash, attempts: 0, expiresAt, createdAt: now },
+      });
+
+    try {
+      await this.emailService.sendPasswordResetCode(email, code);
+    } catch (error) {
+      this.logger.error(
+        'Unable to send a password reset verification code.',
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.database.db
+        .delete(passwordResetVerifications)
+        .where(eq(passwordResetVerifications.userId, user.id));
+      // Keep the public response identical when email delivery fails.
+    }
+
+    return true;
+  }
+
+  async resetPassword(input: ResetPasswordInput): Promise<boolean> {
+    const email = this.normalizeEmail(input.email);
+    if (!/^\d{6}$/.test(input.code)) {
+      throw new BadRequestException('The code is invalid or expired, or no reset was requested.');
+    }
+    if (input.newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters.');
+    }
+
+    const outcome = await this.database.db.transaction(async (transaction) => {
+      const [user] = await transaction
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (!user) return 'invalid' as const;
+
+      const [request] = await transaction
+        .select()
+        .from(passwordResetVerifications)
+        .where(eq(passwordResetVerifications.userId, user.id))
+        .for('update')
+        .limit(1);
+      if (!request || request.expiresAt <= new Date() || request.attempts >= 5) {
+        if (request?.expiresAt && request.expiresAt <= new Date()) {
+          await transaction
+            .delete(passwordResetVerifications)
+            .where(eq(passwordResetVerifications.userId, user.id));
+        }
+        return 'invalid' as const;
+      }
+
+      if (!(await verify(request.codeHash, input.code))) {
+        await transaction
+          .update(passwordResetVerifications)
+          .set({ attempts: sql`${passwordResetVerifications.attempts} + 1` })
+          .where(eq(passwordResetVerifications.userId, user.id));
+        return 'invalid' as const;
+      }
+
+      const passwordHash = await hash(input.newPassword);
+      await transaction
+        .update(users)
+        .set({ passwordHash })
+        .where(eq(users.id, user.id));
+      await transaction
+        .delete(passwordResetVerifications)
+        .where(eq(passwordResetVerifications.userId, user.id));
+      await transaction
+        .update(refreshSessions)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(refreshSessions.userId, user.id),
+            isNull(refreshSessions.revokedAt),
+          ),
+        );
+      return 'reset' as const;
+    });
+
+    if (outcome === 'invalid') {
+      throw new UnauthorizedException(
+        'The code is invalid or expired, or no reset was requested.',
+      );
+    }
+    return true;
   }
 
   async refresh(refreshToken: string): Promise<AuthSession> {
