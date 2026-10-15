@@ -89,6 +89,9 @@ export default function LoginPage() {
         <label className="auth-label" htmlFor="login-password">
           Password
         </label>
+        <p className="auth-forgot-link">
+          <Link href="/forgot-password">Forgot password?</Link>
+        </p>
         <Controller
           name="password"
           control={control}

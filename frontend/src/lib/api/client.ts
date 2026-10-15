@@ -80,6 +80,8 @@ export const queries = {
   signup: `mutation Signup($input: SignupInput!) { signup(input: $input) }`,
   verifySignup: `mutation VerifySignup($input: VerifySignupInput!) { verifySignup(input: $input) { accessToken user { id name email createdAt } } }`,
   login: `mutation Login($input: LoginInput!) { login(input: $input) { accessToken user { id name email createdAt } } }`,
+  requestPasswordReset: `mutation RequestPasswordReset($email: String!) { requestPasswordReset(email: $email) }`,
+  resetPassword: `mutation ResetPassword($input: ResetPasswordInput!) { resetPassword(input: $input) }`,
   refresh: `mutation Refresh { refresh { accessToken user { id name email createdAt } } }`,
   logout: `mutation Logout { logout }`,
   me: `query Me { me { id name email createdAt } }`,
