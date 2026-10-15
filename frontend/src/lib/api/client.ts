@@ -77,7 +77,8 @@ export async function gql<T>(query: string, variables?: Record<string, unknown>,
 }
 
 export const queries = {
-  signup: `mutation Signup($input: SignupInput!) { signup(input: $input) { accessToken user { id name email createdAt } } }`,
+  signup: `mutation Signup($input: SignupInput!) { signup(input: $input) }`,
+  verifySignup: `mutation VerifySignup($input: VerifySignupInput!) { verifySignup(input: $input) { accessToken user { id name email createdAt } } }`,
   login: `mutation Login($input: LoginInput!) { login(input: $input) { accessToken user { id name email createdAt } } }`,
   refresh: `mutation Refresh { refresh { accessToken user { id name email createdAt } } }`,
   logout: `mutation Logout { logout }`,

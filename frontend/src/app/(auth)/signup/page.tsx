@@ -36,6 +36,9 @@ export default function SignupPage() {
   const { acceptSession } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
   const {
     control,
     handleSubmit,
@@ -49,11 +52,11 @@ export default function SignupPage() {
   async function submit({ name, email, password }: FormValues) {
     setServerError("");
     try {
-      const { signup } = await gql<{ signup: AuthPayload }>(queries.signup, {
+      await gql<{ signup: boolean }>(queries.signup, {
         input: { name: name.trim(), email: email.trim(), password },
       });
-      acceptSession(signup);
-      router.replace("/dashboard");
+      setVerificationEmail(email.trim());
+      setVerificationCode("");
     } catch (error) {
       setServerError(
         error instanceof Error
@@ -63,8 +66,90 @@ export default function SignupPage() {
     }
   }
 
+  async function verifyCode() {
+    if (!/^\d{6}$/.test(verificationCode)) {
+      setServerError("Enter the six-digit code from your email.");
+      return;
+    }
+
+    setServerError("");
+    setIsVerifying(true);
+    try {
+      const { verifySignup } = await gql<{ verifySignup: AuthPayload }>(
+        queries.verifySignup,
+        { input: { email: verificationEmail, code: verificationCode } },
+      );
+      acceptSession(verifySignup);
+      router.replace("/dashboard");
+    } catch (error) {
+      setServerError(
+        error instanceof Error ? error.message : "We could not verify your email.",
+      );
+    } finally {
+      setIsVerifying(false);
+    }
+  }
+
   return (
     <AuthFrame mode="signup">
+      {verificationEmail ? (
+        <>
+          <h2 className="auth-title">Check your email</h2>
+          <p className="auth-subtitle">
+            Enter the six-digit code we sent to <strong>{verificationEmail}</strong> to
+            finish creating your account.
+          </p>
+          <form
+            className="auth-fields auth-fields-login"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void verifyCode();
+            }}
+            noValidate
+          >
+            <label className="auth-label" htmlFor="signup-verification-code">
+              Verification code
+            </label>
+            <Input
+              id="signup-verification-code"
+              value={verificationCode}
+              onChange={(event) =>
+                setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              maxLength={6}
+            />
+            {serverError && (
+              <div role="alert" className="auth-server-error">
+                {serverError}
+              </div>
+            )}
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              loading={isVerifying}
+              disabled={isVerifying}
+              className="auth-submit"
+            >
+              Verify email
+            </Button>
+            <Button
+              type="link"
+              onClick={() => {
+                setVerificationEmail("");
+                setVerificationCode("");
+                setServerError("");
+              }}
+            >
+              Use different signup details
+            </Button>
+          </form>
+        </>
+      ) : (
+        <>
       <h2 className="auth-title">Create your account</h2>
       <p className="auth-subtitle">
         A few details and you’re ready to get started.
@@ -202,6 +287,8 @@ export default function SignupPage() {
       <p className="auth-switch">
         Already have an account? <Link href="/login">Sign in</Link>
       </p>
+        </>
+      )}
     </AuthFrame>
   );
 }
