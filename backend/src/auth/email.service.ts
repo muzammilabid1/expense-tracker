@@ -9,6 +9,19 @@ export class EmailService {
   constructor(private readonly config: ConfigService) {}
 
   async sendEmailChangeCode(to: string, code: string): Promise<void> {
+    await this.sendCode(to, code, 'Verify your new email address', 'email-change-otp.ejs');
+  }
+
+  async sendSignupVerificationCode(to: string, code: string): Promise<void> {
+    await this.sendCode(to, code, 'Verify your Northstar account', 'signup-otp.ejs');
+  }
+
+  private async sendCode(
+    to: string,
+    code: string,
+    subject: string,
+    template: string,
+  ): Promise<void> {
     const host = this.config.get<string>('SMTP_HOST');
     const port = Number(this.config.get<string>('SMTP_PORT') ?? '587');
     const from = this.config.get<string>('EMAIL_FROM');
@@ -22,7 +35,7 @@ export class EmailService {
     }
 
     const html = await renderFile(
-      join(__dirname, 'templates', 'email-change-otp.ejs'),
+      join(__dirname, 'templates', template),
       { code, expiresMinutes: 10 },
     );
     const transporter = createTransport({
@@ -35,7 +48,7 @@ export class EmailService {
     await transporter.sendMail({
       from,
       to,
-      subject: 'Verify your new email address',
+      subject,
       html,
     });
   }

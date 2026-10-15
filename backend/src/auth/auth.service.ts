@@ -13,7 +13,12 @@ import { JwtService } from '@nestjs/jwt';
 import { and, eq, gt, isNull, lte, ne, sql } from 'drizzle-orm';
 import { hash, verify } from 'argon2';
 import { DatabaseService } from '../db/database.module';
-import { emailChangeVerifications, refreshSessions, users } from '../db/schema';
+import {
+  emailChangeVerifications,
+  refreshSessions,
+  signupVerifications,
+  users,
+} from '../db/schema';
 import { EmailService } from './email.service';
 import {
   AuthPayload,
@@ -26,6 +31,10 @@ import {
 type UserRecord = typeof users.$inferSelect;
 
 type VerifyEmailChangeResult =
+  | { status: 'verified'; user: UserRecord }
+  | { status: 'missing' | 'expired' | 'locked' | 'incorrect' | 'in_use' };
+
+type VerifySignupResult =
   | { status: 'verified'; user: UserRecord }
   | { status: 'missing' | 'expired' | 'locked' | 'incorrect' | 'in_use' };
 
@@ -44,7 +53,7 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-  async signup(input: SignupInput): Promise<AuthSession> {
+  async signup(input: SignupInput): Promise<boolean> {
     const name = input.name.trim();
     const email = this.normalizeEmail(input.email);
 
@@ -66,13 +75,137 @@ export class AuthService {
       throw new ConflictException('An account with this email already exists.');
     }
 
-    const passwordHash = await hash(input.password);
-    const [newUser] = await this.database.db
-      .insert(users)
-      .values({ name, email, passwordHash })
-      .returning();
+    const now = new Date();
+    const [pendingSignup] = await this.database.db
+      .select()
+      .from(signupVerifications)
+      .where(eq(signupVerifications.email, email))
+      .limit(1);
 
-    return this.createSession(newUser);
+    if (pendingSignup && now.getTime() - pendingSignup.createdAt.getTime() < 60_000) {
+      throw new HttpException(
+        'Wait one minute before requesting another code.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const code = String(randomInt(100_000, 1_000_000));
+    const [passwordHash, codeHash] = await Promise.all([
+      hash(input.password),
+      hash(code),
+    ]);
+    const expiresAt = new Date(now.getTime() + 10 * 60_000);
+
+    await this.database.db
+      .insert(signupVerifications)
+      .values({ name, email, passwordHash, codeHash, expiresAt, createdAt: now })
+      .onConflictDoUpdate({
+        target: signupVerifications.email,
+        set: { name, passwordHash, codeHash, attempts: 0, expiresAt, createdAt: now },
+      });
+
+    try {
+      await this.emailService.sendSignupVerificationCode(email, code);
+    } catch (error) {
+      this.logger.error(
+        'Unable to send a signup verification code.',
+        error instanceof Error ? error.stack : undefined,
+      );
+      await this.database.db
+        .delete(signupVerifications)
+        .where(eq(signupVerifications.email, email));
+      throw new ServiceUnavailableException(
+        'We could not send the verification email. Check the email settings and try again.',
+      );
+    }
+
+    return true;
+  }
+
+  async verifySignup(emailInput: string, code: string): Promise<AuthSession> {
+    const email = this.normalizeEmail(emailInput);
+    if (!/^\d{6}$/.test(code)) {
+      throw new BadRequestException('Enter the six-digit code from your email.');
+    }
+
+    let result: VerifySignupResult;
+    try {
+      result = await this.database.db.transaction(async (transaction) => {
+        const [request] = await transaction
+          .select()
+          .from(signupVerifications)
+          .where(eq(signupVerifications.email, email))
+          .for('update')
+          .limit(1);
+
+        if (!request) return { status: 'missing' as const };
+        if (request.expiresAt <= new Date()) {
+          await transaction
+            .delete(signupVerifications)
+            .where(eq(signupVerifications.id, request.id));
+          return { status: 'expired' as const };
+        }
+        if (request.attempts >= 5) return { status: 'locked' as const };
+        if (!(await verify(request.codeHash, code))) {
+          await transaction
+            .update(signupVerifications)
+            .set({ attempts: sql`${signupVerifications.attempts} + 1` })
+            .where(eq(signupVerifications.id, request.id));
+          return { status: 'incorrect' as const };
+        }
+
+        const [existingUser] = await transaction
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, request.email))
+          .limit(1);
+        if (existingUser) {
+          await transaction
+            .delete(signupVerifications)
+            .where(eq(signupVerifications.id, request.id));
+          return { status: 'in_use' as const };
+        }
+
+        const [newUser] = await transaction
+          .insert(users)
+          .values({
+            name: request.name,
+            email: request.email,
+            passwordHash: request.passwordHash,
+          })
+          .returning();
+        await transaction
+          .delete(signupVerifications)
+          .where(eq(signupVerifications.id, request.id));
+
+        return newUser
+          ? { status: 'verified' as const, user: newUser }
+          : { status: 'missing' as const };
+      });
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException('An account with this email already exists.');
+      }
+      throw error;
+    }
+
+    if (result.status === 'verified') return this.createSession(result.user);
+    if (result.status === 'expired') {
+      throw new BadRequestException('That code has expired. Request a new one.');
+    }
+    if (result.status === 'locked') {
+      throw new HttpException(
+        'Too many incorrect codes. Request a new code.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    if (result.status === 'incorrect') {
+      throw new UnauthorizedException('That code is incorrect. Check it and try again.');
+    }
+    if (result.status === 'in_use') {
+      throw new ConflictException('An account with this email already exists.');
+    }
+    throw new BadRequestException('There is no active signup for this email. Request a new code.');
   }
 
   async login(input: LoginInput): Promise<AuthSession> {

@@ -13,6 +13,7 @@ import {
   SignupInput,
   UpdateProfileInput,
   User,
+  VerifySignupInput,
 } from './auth.types';
 import { GqlAuthGuard } from './gql-auth.guard';
 import type { GraphqlRequestContext } from '../graphql/graphql-context';
@@ -21,12 +22,20 @@ import type { GraphqlRequestContext } from '../graphql/graphql-context';
 export class AuthResolver {
   constructor(private readonly authService: AuthService) {}
 
+  @Mutation(() => Boolean)
+  signup(@Args('input') input: SignupInput): Promise<boolean> {
+    return this.authService.signup(input);
+  }
+
   @Mutation(() => AuthPayload)
-  async signup(
-    @Args('input') input: SignupInput,
+  async verifySignup(
+    @Args('input') input: VerifySignupInput,
     @Context() context: GraphqlRequestContext,
   ): Promise<AuthPayload> {
-    return this.withRefreshCookie(await this.authService.signup(input), context);
+    return this.withRefreshCookie(
+      await this.authService.verifySignup(input.email, input.code),
+      context,
+    );
   }
 
   @Mutation(() => AuthPayload)
