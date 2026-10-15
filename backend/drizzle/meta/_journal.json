@@ -15,6 +15,13 @@
       "when": 1791799654723,
       "tag": "0001_cute_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792060000000,
+      "tag": "0002_signup_verifications",
+      "breakpoints": true
     }
   ]
 }

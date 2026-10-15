@@ -66,6 +66,23 @@ export const emailChangeVerifications = pgTable(
   (table) => [uniqueIndex('email_change_verifications_email_idx').on(table.email)],
 );
 
+export const signupVerifications = pgTable(
+  'signup_verifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    email: varchar('email', { length: 255 }).notNull(),
+    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    codeHash: varchar('code_hash', { length: 255 }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex('signup_verifications_email_idx').on(table.email)],
+);
+
 export const categories = pgTable(
   'categories',
   {
